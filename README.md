@@ -36,6 +36,32 @@ Open **http://127.0.0.1:8000** (use `127.0.0.1`, not `localhost`, so the cookie 
 
 With `DRY_RUN=1` the exact XML that would be uploaded is printed to the browser console instead. Remove it to upload real edits.
 
+## 2b. Or run it with Docker
+
+```bash
+cp .env.example .env      # fill in OSM_CLIENT_ID / OSM_CLIENT_SECRET
+docker compose up -d --build
+```
+
+Open **http://127.0.0.1:8000**. `DRY_RUN` defaults to `1`; set `DRY_RUN=0` in `.env` to upload real edits. The port is bound to `127.0.0.1` only.
+
+### Production with HTTPS (Caddy)
+
+1. Point a DNS record (e.g. `osm.example.com`) at the server. Ports 80 and 443 must be free.
+2. In your OSM OAuth app, register the redirect URI `https://osm.example.com/auth/callback`.
+3. In `.env` set `DOMAIN=osm.example.com`, `ACME_EMAIL=you@example.com` and `DRY_RUN=0`.
+4. Run:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Caddy gets and renews the Let's Encrypt certificate automatically. `OSM_REDIRECT_URI` is set from `DOMAIN`, and the session cookie becomes `Secure` because the URI is `https`.
+
+### Production behind an existing Nginx
+
+If the server already runs Nginx on 80/443 (for example next to the course portal), skip `docker-compose.prod.yml`. Instead, set `PORT=8010` and `OSM_REDIRECT_URI=https://osm.example.com/auth/callback` in `.env`, run `docker compose up -d --build`, and use the server block in `deploy/nginx.conf` with `certbot --nginx`.
+
 ## "Why contribute?" panel
 
 A bilingual (தமிழ் / English) panel explaining the benefit of adding `name:ta`. It opens on a visitor's first visit, can be reopened from the header, and shows live numbers from the user's last scan and their edit count. The text lives in the `<dialog id="why">` block in `app/static/index.html`, so it's easy to edit.
