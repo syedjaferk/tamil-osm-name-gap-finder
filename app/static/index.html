@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tamil Name Gap Finder</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+  :root { --bg:#fff; --fg:#1d1d1f; --muted:#6b6b70; --accent:#c2410c; --ok:#15803d; --err:#b91c1c; --border:#e5e5e5; --band:#fff7ed; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#17171a; --fg:#f2f2f2; --muted:#a0a0a8; --accent:#fb923c; --ok:#4ade80; --err:#f87171; --border:#2c2c30; --band:#2a1d12; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--fg); display:flex; flex-direction:column; height:100vh; }
+  header { padding:10px 16px; border-bottom:1px solid var(--border); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  h1 { font-size:16px; margin:0 12px 0 0; }
+  select, button, input { font:inherit; padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--fg); }
+  button, .btn { background:var(--accent); color:#fff; border:none; cursor:pointer; text-decoration:none; padding:6px 12px; border-radius:6px; display:inline-block; }
+  button.ghost { background:transparent; color:var(--fg); border:1px solid var(--border); }
+  button:disabled { opacity:.6; cursor:wait; }
+  #auth { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  #bar { padding:6px 16px; background:var(--band); border-bottom:1px solid var(--border); display:flex; flex-wrap:wrap; gap:12px; align-items:center; color:var(--muted); }
+  #bar b { color:var(--fg); }
+  #session { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  #map { flex:1; }
+  #map.drawing, #map.drawing .leaflet-interactive { cursor:crosshair; }
+  #draw[aria-pressed="true"] { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .hint kbd { font:12px ui-monospace, monospace; border:1px solid var(--border); border-radius:4px; padding:0 4px; background:var(--bg); }
+  .popup { min-width:220px; }
+  .popup .cat { color:#666; font-size:12px; margin-bottom:6px; }
+  .popup form { display:flex; flex-direction:column; gap:6px; margin:6px 0; }
+  .popup input { width:100%; font-size:15px; }
+  .popup .msg { font-size:12px; min-height:1em; }
+  .popup .msg.ok { color:var(--ok); } .popup .msg.err { color:var(--err); }
+  .popup .links a { margin-right:10px; font-size:12px; }
+  .warn { color:var(--err); }
+
+  /* ---- Why contribute ---- */
+  #why { width:min(720px, calc(100vw - 32px)); max-height:calc(100vh - 32px); padding:0; border:1px solid var(--border);
+         border-radius:14px; background:var(--bg); color:var(--fg); box-shadow:0 20px 60px rgba(0,0,0,.25); }
+  #why::backdrop { background:rgba(0,0,0,.45); }
+  .why-in { padding:24px 24px 20px; overflow:auto; max-height:calc(100vh - 34px); }
+  .why-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .why-top h2 { margin:0 0 4px; font-size:22px; line-height:1.3; }
+  .why-top p { margin:0; color:var(--muted); }
+  .lang { display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; flex-shrink:0; }
+  .lang button { background:transparent; color:var(--fg); border:none; border-radius:0; padding:5px 10px; }
+  .lang button[aria-pressed="true"] { background:var(--accent); color:#fff; }
+  .why-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin:18px 0; }
+  .why-card { border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+  .why-card .ic { font-size:20px; }
+  .why-card h3 { margin:4px 0 4px; font-size:15px; }
+  .why-card p { margin:0; color:var(--muted); font-size:13px; line-height:1.5; }
+  .why-live { background:var(--band); border-radius:10px; padding:12px 14px; margin-bottom:16px; line-height:1.5; }
+  .why-live b { color:var(--accent); font-size:16px; }
+  .why-actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; align-items:center; }
+  .why-actions small { color:var(--muted); margin-right:auto; }
+  [data-lang="ta"] .en, [data-lang="en"] .ta { display:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>தமிழ் பெயர் இடைவெளி · Tamil Name Gap Finder</h1>
+  <select id="city" aria-label="City">
+    <option value="13.0827,80.2707">Chennai</option>
+    <option value="11.0168,76.9558">Coimbatore</option>
+    <option value="9.9252,78.1198">Madurai</option>
+    <option value="10.7905,78.7047">Tiruchirappalli</option>
+    <option value="11.6643,78.1460">Salem</option>
+    <option value="8.7139,77.7567">Tirunelveli</option>
+    <option value="11.9416,79.8083">Puducherry</option>
+  </select>
+  <select id="category" aria-label="Category">
+    <option value="all">All named features</option>
+    <option value="amenity">Amenities</option>
+    <option value="shop">Shops</option>
+    <option value="highway">Roads</option>
+    <option value="place">Places</option>
+    <option value="tourism">Tourism</option>
+    <option value="leisure">Leisure</option>
+    <option value="office">Offices</option>
+    <option value="building">Buildings</option>
+  </select>
+  <button class="ghost" id="draw" title="Click points on the map to outline an area">✏️ Draw area</button>
+  <button class="ghost" id="clearArea" hidden>✕ Clear area</button>
+  <button id="scan">Scan this view</button>
+  <button class="ghost" id="whyBtn">ஏன்? · Why contribute</button>
+  <div id="auth"></div>
+</header>
+
+<dialog id="why" aria-labelledby="whyTitle">
+  <div class="why-in" data-lang="ta">
+    <div class="why-top">
+      <div>
+        <h2 id="whyTitle">
+          <span class="ta">ஒரு தமிழ்ப் பெயர், நீடிக்கும் மாற்றம்</span>
+          <span class="en">One Tamil name, a lasting difference</span>
+        </h2>
+        <p>
+          <span class="ta">நீங்கள் சேர்க்கும் ஒவ்வொரு <code>name:ta</code>-வும் ஏன் முக்கியம்?</span>
+          <span class="en">Why every <code>name:ta</code> you add matters</span>
+        </p>
+      </div>
+      <div class="lang" role="group" aria-label="Language">
+        <button data-set-lang="ta" aria-pressed="true">தமிழ்</button>
+        <button data-set-lang="en" aria-pressed="false">English</button>
+      </div>
+    </div>
+
+    <div class="why-grid">
+      <div class="why-card"><div class="ic">🗺️</div>
+        <h3><span class="ta">தமிழில் பேசும் வரைபடங்கள்</span><span class="en">Maps that speak Tamil</span></h3>
+        <p><span class="ta">OpenStreetMap-ஐ அடிப்படையாகக் கொண்ட வரைபடங்கள், <code>name:ta</code> இருந்தால் மட்டுமே பெயரைத் தமிழில் காட்ட முடியும். இன்று நம் ஊர்களின் பெரும்பாலான தெருக்களும் கடைகளும் ஆங்கிலத்தில் மட்டுமே உள்ளன.</span>
+           <span class="en">Maps built on OpenStreetMap can only show a label in Tamil if <code>name:ta</code> exists. Today most streets and shops in our own towns are labelled in English only.</span></p>
+      </div>
+      <div class="why-card"><div class="ic">🔎</div>
+        <h3><span class="ta">தமிழிலேயே தேடலாம்</span><span class="en">Search in Tamil</span></h3>
+        <p><span class="ta">OSM தேடுபொறிகள் (Nominatim போன்றவை) <code>name:ta</code>-வையும் தேடுகின்றன. நீங்கள் சேர்க்கும் பெயரால், ஒருவர் தமிழில் தட்டச்சு செய்தே அந்த இடத்தைக் கண்டுபிடிக்கலாம்.</span>
+           <span class="en">OSM search engines such as Nominatim index <code>name:ta</code>. The name you add lets someone find that place by typing in Tamil.</span></p>
+      </div>
+      <div class="why-card"><div class="ic">👵🏽</div>
+        <h3><span class="ta">தமிழை முதலில் படிப்பவர்களுக்கு</span><span class="en">For people who read Tamil first</span></h3>
+        <p><span class="ta">முதியோர், கிராமப்புற மக்கள், ஆங்கிலம் சரளமாகத் தெரியாதவர்கள், தமிழ்க் குரல் வழிகாட்டலை நம்பியிருப்பவர்கள் என அனைவருக்கும் வரைபடம் புரியும்.</span>
+           <span class="en">Elders, rural users, people who aren't fluent in English, and anyone relying on Tamil voice guidance can all use the map with confidence.</span></p>
+      </div>
+      <div class="why-card"><div class="ic">🤝</div>
+        <h3><span class="ta">அனைவருக்கும் சொந்தமான தரவு</span><span class="en">Data owned by everyone</span></h3>
+        <p><span class="ta">OSM திறந்த உரிமத்தில் (ODbL) உள்ளது; எந்த நிறுவனமும் அதைப் பூட்டி வைக்க முடியாது. OsmAnd, Organic Maps, விக்கிப்பீடியா வரைபடங்கள், பேரிடர் மீட்புக் குழுக்கள் எனப் பலரும் இதைப் பயன்படுத்துகின்றனர்.</span>
+           <span class="en">OSM is open data (ODbL), so no company can lock it away. Apps like OsmAnd and Organic Maps, Wikipedia's maps, and disaster-response teams all build on it.</span></p>
+      </div>
+      <div class="why-card"><div class="ic">🏷️</div>
+        <h3><span class="ta">ஊர்ப் பெயர்கள் சரியாக</span><span class="en">Local names, done right</span></h3>
+        <p><span class="ta">இயந்திர ஒலிபெயர்ப்பு அல்ல, மக்கள் உண்மையில் அழைக்கும் பெயர். உள்ளூர் அறிவு உள்ள உங்களால்தான் இதைச் சரியாகச் செய்ய முடியும்.</span>
+           <span class="en">Not a machine transliteration, but the name people actually use. Only someone with local knowledge, like you, can get it right.</span></p>
+      </div>
+      <div class="why-card"><div class="ic">⏱️</div>
+        <h3><span class="ta">சிறு முயற்சி, நீடிக்கும் பயன்</span><span class="en">Small effort, lasting impact</span></h3>
+        <p><span class="ta">ஒரு பெயர் சேர்க்க அரை நிமிடம் போதும். அது ஆண்டுக்கணக்கில் வரைபடத்தில் நிலைத்திருந்து, அதைப் பயன்படுத்தும் எல்லாச் செயலிகளுக்கும் கிடைக்கும்.</span>
+           <span class="en">Adding a name takes about 30 seconds. It stays on the map for years and becomes available to every app that uses OSM data.</span></p>
+      </div>
+    </div>
+
+    <div class="why-live" id="whyLive"></div>
+
+    <div class="why-actions">
+      <small>
+        <span class="ta">உங்களுக்கு உறுதியாகத் தெரிந்த பெயர்களை மட்டும் சேர்க்கவும்.</span>
+        <span class="en">Only add names you're sure of.</span>
+      </small>
+      <a class="btn" id="whyLogin" href="/auth/login" hidden>
+        <span class="ta">OSM-இல் உள்நுழைக</span><span class="en">Log in with OSM</span>
+      </a>
+      <button id="whyStart">
+        <span class="ta">தொடங்குவோம் →</span><span class="en">Let's start →</span>
+      </button>
+    </div>
+  </div>
+</dialog>
+<div id="bar">
+  <span id="stats">Zoom in to a neighbourhood and press Scan.</span>
+  <span id="session"></span>
+</div>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const TAMIL = /[஀-௿]/;
+
+const map = L.map('map').setView([13.0827, 80.2707], 15);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);
+const cluster = L.markerClusterGroup().addTo(map);
+
+const GAP_STYLE  = { radius: 7, color: '#c2410c', fillColor: '#fb923c', fillOpacity: .9, weight: 2 };
+const DONE_STYLE = { radius: 7, color: '#15803d', fillColor: '#4ade80', fillOpacity: .9, weight: 2 };
+
+let me = { logged_in: false };
+const markers = new Map();   // "node/123" -> { marker, props, done }
+let lastStats = null;
+
+// ---------- auth ----------
+async function loadMe() {
+  me = await (await fetch('/api/me')).json();
+  renderAuth();
+}
+
+function renderAuth() {
+  const a = $('auth'), s = $('session');
+  if (!me.configured) {
+    a.innerHTML = '<span class="warn">Editing disabled: set OSM_CLIENT_ID (see README)</span>';
+    s.innerHTML = '';
+    return;
+  }
+  if (!me.logged_in) {
+    a.innerHTML = '<a class="btn" href="/auth/login">Log in with OpenStreetMap</a>';
+    s.innerHTML = '';
+    return;
+  }
+  a.innerHTML = `<span>வணக்கம், <b>${esc(me.user.display_name)}</b></span>
+    <form method="post" action="/auth/logout" style="margin:0"><button class="ghost">Log out</button></form>`;
+  const cs = me.changeset_id
+    ? `Changeset <a href="${me.osm_url}/changeset/${me.changeset_id}" target="_blank" rel="noopener">#${me.changeset_id}</a> open`
+    : 'No open changeset';
+  s.innerHTML = `${me.dry_run ? '<b class="warn">DRY RUN</b> · ' : ''}${cs} · <b>${me.edits}</b> name${me.edits === 1 ? '' : 's'} added
+    ${me.changeset_id ? '<button class="ghost" id="finish">Finish &amp; close changeset</button>' : ''}`;
+  const f = $('finish');
+  if (f) f.onclick = async () => {
+    f.disabled = true;
+    const r = await fetch('/api/changeset/close', { method: 'POST' });
+    if (!r.ok) alert((await r.json()).detail || 'Could not close changeset');
+    loadMe();
+  };
+}
+
+const err = new URLSearchParams(location.search).get('login_error');
+if (err) { alert('OpenStreetMap login failed: ' + err); history.replaceState(null, '', '/'); }
+
+// ---------- why contribute ----------
+const why = $('why'), whyIn = why.querySelector('.why-in');
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} }
+};
+
+function setLang(lang) {
+  whyIn.dataset.lang = lang;
+  why.querySelectorAll('[data-set-lang]').forEach(b => b.setAttribute('aria-pressed', b.dataset.setLang === lang));
+  store.set('tngf_lang', lang);
+}
+why.querySelectorAll('[data-set-lang]').forEach(b => b.onclick = () => setLang(b.dataset.setLang));
+setLang(store.get('tngf_lang') || 'ta');
+
+function renderWhyLive() {
+  let ta, en;
+  if (lastStats && lastStats.named_total) {
+    const s = lastStats, cov = (100 * (s.named_total - s.missing_ta) / s.named_total).toFixed(1);
+    ta = `நீங்கள் பார்த்த பகுதியில் உள்ள <b>${s.named_total}</b> இடங்களில் <b>${s.missing_ta}</b> இடங்களுக்கு இன்னும் தமிழ்ப் பெயர் இல்லை. தமிழ்ப் பெயர் உள்ளவை <b>${cov}%</b> மட்டுமே.`;
+    en = `In the area you scanned, <b>${s.missing_ta}</b> of <b>${s.named_total}</b> named places still have no Tamil name. Tamil coverage is only <b>${cov}%</b>.`;
+  } else {
+    ta = 'உங்கள் தெருவை ஸ்கேன் செய்து பாருங்கள், எத்தனை இடங்களுக்குத் தமிழ்ப் பெயர் இல்லை என்று தெரியும்.';
+    en = 'Scan your own street to see how many places still need a Tamil name.';
+  }
+  if (me.logged_in && me.edits > 0 && !me.dry_run) {
+    ta += ` இதுவரை நீங்கள் <b>${me.edits}</b> பெயர்கள் சேர்த்துள்ளீர்கள். நன்றி! 🙏`;
+    en += ` You've added <b>${me.edits}</b> name${me.edits === 1 ? '' : 's'} so far. Thank you! 🙏`;
+  }
+  $('whyLive').innerHTML = `<span class="ta">${ta}</span><span class="en">${en}</span>`;
+  $('whyLogin').hidden = !(me.configured && !me.logged_in);
+}
+
+function openWhy() { renderWhyLive(); why.showModal(); }
+$('whyBtn').onclick = openWhy;
+$('whyStart').onclick = () => why.close();
+why.addEventListener('click', e => { if (e.target === why) why.close(); });   // click backdrop to close
+why.addEventListener('close', () => store.set('tngf_seen_why', '1'));
+
+loadMe().then(() => { if (!store.get('tngf_seen_why')) openWhy(); });
+
+// ---------- map ----------
+$('city').onchange = e => { const [lat, lon] = e.target.value.split(',').map(Number); map.setView([lat, lon], 15); };
+
+function popupHtml(key) {
+  const { props: p, done } = markers.get(key);
+  const head = `<b>${esc(p.name)}</b>${p.name_en ? '<br>' + esc(p.name_en) : ''}<div class="cat">${esc(p.category)}</div>`;
+  const links = `<div class="links"><a href="${p.view_url}" target="_blank" rel="noopener">View on OSM</a>
+                 <a href="${p.edit_url}" target="_blank" rel="noopener">Open in iD</a></div>`;
+  let body;
+  if (done) {
+    body = `<div class="msg ok">✓ name:ta = ${esc(done)}</div>`;
+  } else if (me.logged_in) {
+    body = `<form class="ta-form" data-key="${key}">
+      <input name="name_ta" lang="ta" placeholder="தமிழ் பெயர் எழுதுங்கள்" autocomplete="off" required maxlength="255">
+      <button>Save name:ta to OSM</button>
+      <div class="msg"></div></form>`;
+  } else {
+    body = me.configured ? '<div class="msg"><a href="/auth/login">Log in</a> to add the Tamil name here.</div>' : '';
+  }
+  return `<div class="popup">${head}${body}${links}</div>`;
+}
+
+document.addEventListener('submit', async e => {
+  const form = e.target.closest('.ta-form');
+  if (!form) return;
+  e.preventDefault();
+  const key = form.dataset.key, entry = markers.get(key);
+  const input = form.name_ta, btn = form.querySelector('button'), msg = form.querySelector('.msg');
+  const value = input.value.trim().replace(/\s+/g, ' ');
+  msg.className = 'msg';
+  if (!TAMIL.test(value)) { msg.className = 'msg err'; msg.textContent = 'Please type the name in Tamil script.'; return; }
+  if (!confirm(`Save to OpenStreetMap?\n\n${entry.props.name}\nname:ta = ${value}`)) return;
+
+  btn.disabled = true; msg.textContent = 'Saving…';
+  try {
+    const res = await fetch('/api/edit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ osm_type: entry.props.osm_type, osm_id: entry.props.osm_id, name_ta: value })
+    });
+    const data = await res.json();
+    if (res.status === 401) { await loadMe(); throw new Error(data.detail); }
+    if (!res.ok) throw new Error(data.detail || 'Save failed');
+    if (data.dry_run) { console.log('DRY RUN payload:\n' + data.xml); }
+    entry.done = value;
+    entry.marker.setStyle(DONE_STYLE);
+    entry.marker.setPopupContent(popupHtml(key));
+    if (lastStats && !data.dry_run) { lastStats.missing_ta--; renderStats(); }
+    loadMe();
+  } catch (ex) {
+    msg.className = 'msg err'; msg.textContent = ex.message;
+    btn.disabled = false;
+  }
+});
+
+function renderStats() {
+  const s = lastStats;
+  const cov = s.named_total ? (100 * (s.named_total - s.missing_ta) / s.named_total).toFixed(1) : null;
+  $('stats').innerHTML = s.named_total
+    ? `<b>${s.missing_ta}</b> of <b>${s.named_total}</b> named features lack <code>name:ta</code> · Tamil coverage <b>${cov}%</b>${s.truncated ? ' (showing first ' + markers.size + ')' : ''}`
+    : `No named features in this ${area ? 'area' : 'view'}.`;
+}
+
+// ---------- draw an area ----------
+const AREA_STYLE  = { color: '#2563eb', weight: 2, fillColor: '#3b82f6', fillOpacity: .08 };
+const DRAFT_STYLE = { color: '#2563eb', weight: 2, dashArray: '5 5', interactive: false };
+let area = null;      // finished L.polygon
+let drawing = null;   // { pts, line, guide, dots }
+
+function updateAreaButtons() {
+  $('draw').setAttribute('aria-pressed', !!drawing);
+  $('draw').textContent = drawing ? '✓ Finish area' : (area ? '✏️ Redraw area' : '✏️ Draw area');
+  $('clearArea').hidden = !(area || drawing);
+  $('clearArea').textContent = drawing ? '✕ Cancel' : '✕ Clear area';
+  $('scan').textContent = area ? 'Scan drawn area' : 'Scan this view';
+  $('scan').disabled = !!drawing;
+}
+
+function drawHint() {
+  const n = drawing.pts.length;
+  $('stats').innerHTML = `<span class="hint">Click the map to add points (${n} so far). ` +
+    (n >= 3 ? 'Click the first point, double-click or press <kbd>Enter</kbd> to finish. ' : '') +
+    '<kbd>Backspace</kbd> undo · <kbd>Esc</kbd> cancel</span>';
+}
+
+function startDraw() {
+  clearArea();
+  map.removeLayer(cluster);              // markers would swallow clicks while drawing
+  map.doubleClickZoom.disable();
+  drawing = {
+    pts: [],
+    line: L.polyline([], DRAFT_STYLE).addTo(map),
+    guide: L.polyline([], { ...DRAFT_STYLE, opacity: .5 }).addTo(map),
+    dots: L.layerGroup().addTo(map),
+  };
+  $('map').classList.add('drawing');
+  updateAreaButtons(); drawHint();
+}
+
+function stopDrawing() {
+  if (!drawing) return;
+  [drawing.line, drawing.guide, drawing.dots].forEach(l => map.removeLayer(l));
+  drawing = null;
+  $('map').classList.remove('drawing');
+  map.addLayer(cluster);
+  setTimeout(() => map.doubleClickZoom.enable(), 0);
+}
+
+function redrawDraft() {
+  drawing.line.setLatLngs(drawing.pts);
+  drawing.dots.clearLayers();
+  drawing.pts.forEach((p, i) => L.circleMarker(p, {
+    radius: i === 0 ? 6 : 4, color: '#2563eb', fillColor: '#fff', fillOpacity: 1, weight: 2, interactive: false
+  }).addTo(drawing.dots));
+  drawHint();
+}
+
+function finishDraw() {
+  if (!drawing) return;
+  // A double-click also fires two clicks — drop points that landed on top of each other.
+  const pts = drawing.pts.filter((p, i, a) =>
+    i === 0 || map.latLngToContainerPoint(p).distanceTo(map.latLngToContainerPoint(a[i - 1])) > 3);
+  if (pts.length < 3) { $('stats').textContent = 'An area needs at least 3 points — keep clicking.'; return; }
+  stopDrawing();
+  area = L.polygon(pts, AREA_STYLE).addTo(map);
+  area.bringToBack();
+  map.fitBounds(area.getBounds(), { padding: [30, 30] });
+  updateAreaButtons();
+  scan();
+}
+
+function clearArea() {
+  if (area) { map.removeLayer(area); area = null; }
+  stopDrawing();
+  updateAreaButtons();
+}
+
+map.on('click', e => {
+  if (!drawing) return;
+  const p = drawing.pts;
+  if (p.length >= 3 && map.latLngToContainerPoint(p[0]).distanceTo(e.containerPoint) < 12) return finishDraw();
+  p.push(e.latlng);
+  redrawDraft();
+});
+map.on('dblclick', () => { if (drawing) finishDraw(); });
+map.on('mousemove', e => {
+  if (drawing && drawing.pts.length) drawing.guide.setLatLngs([drawing.pts.at(-1), e.latlng, drawing.pts[0]]);
+});
+document.addEventListener('keydown', e => {
+  if (!drawing || e.target.closest('input, select, textarea')) return;
+  if (e.key === 'Escape') { clearArea(); $('stats').textContent = 'Drawing cancelled.'; }
+  else if (e.key === 'Enter') finishDraw();
+  else if (e.key === 'Backspace') { e.preventDefault(); drawing.pts.pop(); redrawDraft(); drawing.guide.setLatLngs([]); }
+});
+
+$('draw').onclick = () => drawing ? finishDraw() : startDraw();
+$('clearArea').onclick = () => {
+  const wasDrawing = !!drawing;
+  clearArea();
+  $('stats').textContent = wasDrawing ? 'Drawing cancelled.' : 'Area cleared. Scan the view or draw a new area.';
+};
+
+// ---------- scan ----------
+function errorText(data) {
+  if (Array.isArray(data.detail)) return data.detail.map(d => d.msg).join('; ');
+  return data.detail || 'Request failed';
+}
+
+$('scan').onclick = () => scan();
+
+async function scan() {
+  const category = $('category').value;
+  let req;
+  if (area) {
+    const coords = area.getLatLngs()[0].map(p => [+p.lat.toFixed(6), +p.lng.toFixed(6)]);
+    req = fetch('/api/gaps/area', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coords, category })
+    });
+  } else {
+    const b = map.getBounds();
+    req = fetch('/api/gaps?' + new URLSearchParams({
+      south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast(), category
+    }));
+  }
+  $('scan').disabled = true;
+  $('stats').textContent = 'Asking Overpass…';
+  try {
+    const res = await req;
+    const data = await res.json();
+    if (!res.ok) throw new Error(errorText(data));
+    cluster.clearLayers(); markers.clear();
+    for (const f of data.features) {
+      const p = f.properties, key = `${p.osm_type}/${p.osm_id}`;
+      const [lon, lat] = f.geometry.coordinates;
+      const marker = L.circleMarker([lat, lon], GAP_STYLE);
+      markers.set(key, { marker, props: p, done: null });
+      marker.bindPopup(() => popupHtml(key));
+      marker.on('popupopen', () => { const i = document.querySelector('.ta-form input'); if (i) i.focus(); });
+      cluster.addLayer(marker);
+    }
+    lastStats = data.stats;
+    renderStats();
+  } catch (ex) {
+    $('stats').textContent = '⚠️ ' + ex.message;
+  } finally {
+    $('scan').disabled = !!drawing;
+  }
+}
+</script>
+</body>
+</html>
