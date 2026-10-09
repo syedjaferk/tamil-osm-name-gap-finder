@@ -1,0 +1,27 @@
+:root { --bg:#fff; --fg:#1d1d1f; --muted:#6b6b70; --accent:#c2410c; --ok:#15803d; --err:#b91c1c; --border:#e5e5e5; --band:#fff7ed; }
+@media (prefers-color-scheme: dark) { :root { --bg:#17171a; --fg:#f2f2f2; --muted:#a0a0a8; --accent:#fb923c; --ok:#4ade80; --err:#f87171; --border:#2c2c30; --band:#2a1d12; } }
+* { box-sizing: border-box; }
+[hidden] { display:none !important; }   /* button styles below would otherwise override it */
+body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--fg); display:flex; flex-direction:column; height:100vh; }
+header { padding:10px 16px; border-bottom:1px solid var(--border); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+h1 { font-size:16px; margin:0 12px 0 0; }
+select, button, input { font:inherit; padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--fg); }
+button, .btn { background:var(--accent); color:#fff; border:none; cursor:pointer; text-decoration:none; padding:6px 12px; border-radius:6px; display:inline-block; }
+button.ghost { background:transparent; color:var(--fg); border:1px solid var(--border); }
+button:disabled { opacity:.6; cursor:wait; }
+#auth { margin-left:auto; display:flex; gap:8px; align-items:center; }
+#bar { padding:6px 16px; background:var(--band); border-bottom:1px solid var(--border); display:flex; flex-wrap:wrap; gap:12px; align-items:center; color:var(--muted); }
+#bar b { color:var(--fg); }
+#session { margin-left:auto; display:flex; gap:8px; align-items:center; }
+#map { flex:1; }
+#map.drawing, #map.drawing .leaflet-interactive { cursor:crosshair; }
+#draw[aria-pressed="true"] { background:#2563eb; color:#fff; border-color:#2563eb; }
+.hint kbd { font:12px ui-monospace, monospace; border:1px solid var(--border); border-radius:4px; padding:0 4px; background:var(--bg); }
+.popup { min-width:220px; }
+.popup .cat { color:#666; font-size:12px; margin-bottom:6px; }
+.popup form { display:flex; flex-direction:column; gap:6px; margin:6px 0; }
+.popup input { width:100%; font-size:15px; }
+.popup .msg { font-size:12px; min-height:1em; }
+.popup .msg.ok { color:var(--ok); } .popup .msg.err { color:var(--err); }
+.popup .links a { margin-right:10px; font-size:12px; }
+.warn { color:var(--err); }
